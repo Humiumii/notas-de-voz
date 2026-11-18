@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .env*
 output/
+.playwright-cli/
+/transcripciones/
+/grabaciones/
+/nota-de-voz*.md
 *.wav
 *.mp3
 *.m4a
