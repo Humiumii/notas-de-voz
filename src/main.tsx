@@ -5,6 +5,7 @@ import { useRecorder } from './useRecorder'
 import './styles.css'
 
 type AudioSource = { name: string; blob?: Blob; url?: string }
+type Segment = { start: number; end: number; text: string }
 const example: AudioSource = {
   name: 'Ideas para el portafolio',
   url: import.meta.env.BASE_URL + 'ejemplo.mp3',
@@ -19,6 +20,8 @@ function App() {
   const [source, setSource] = useState<AudioSource | null>(null)
   const [playback, setPlayback] = useState('')
   const [error, setError] = useState('')
+  const [processing, setProcessing] = useState(false)
+  const [segments, setSegments] = useState<Segment[]>([])
 
   useEffect(() => {
     if (!source?.blob) {
@@ -37,11 +40,36 @@ function App() {
       return
     }
     setSource(next)
+    setSegments([])
+  }
+
+  async function transcribe() {
+    if (!source) return
+    setProcessing(true)
+    setError('')
+    try {
+      const blob: Blob = source.blob ?? await fetch(example.url!).then(response => {
+        if (!response.ok) throw new Error('No se pudo cargar la nota de ejemplo.')
+        return response.blob()
+      })
+      const form = new FormData()
+      form.append('audio', blob, blob instanceof File ? blob.name : 'nota')
+      const response = await fetch('/api/transcribir', { method: 'POST', body: form })
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !Array.isArray(result?.segments)) {
+        throw new Error(typeof result?.detail === 'string' ? result.detail : 'La API local no responde. Comprueba que esté en ejecución.')
+      }
+      setSegments(result.segments)
+    } catch (error) {
+      setError(error instanceof TypeError ? 'No se pudo conectar con la API local.' : (error as Error).message)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const recorder = useRecorder(blob => load({ name: 'Grabación del micrófono', blob }), setError)
   const recording = recorder.state === 'recording'
-  const busy = recorder.state !== 'idle'
+  const busy = recorder.state !== 'idle' || processing
 
   return (
     <>
@@ -49,14 +77,14 @@ function App() {
       <main className="wrap">
         <section className="intro">
           <h1>Una nota de voz</h1>
-          <p>Graba o carga una nota corta para escucharla aquí.</p>
+          <p>Graba o carga una nota corta y conviértela en texto en español.</p>
         </section>
         <div className="workspace">
           <section className="panel audio-panel" aria-labelledby="audio-title">
             <h2 id="audio-title">Audio de origen</h2>
             <p className="muted">Hasta 3 minutos · máximo 32 MB</p>
             <div className="actions">
-              <button className="primary" disabled={recorder.state === 'requesting'} onClick={() => {
+              <button className="primary" disabled={recorder.state === 'requesting' || processing} onClick={() => {
                 setError('')
                 if (recording) recorder.stop()
                 else void recorder.start()
@@ -83,13 +111,24 @@ function App() {
                 <audio key={playback} src={playback} controls preload="metadata" aria-label="Reproductor de la nota"
                   onError={() => setError('El navegador no pudo reproducir este archivo. Prueba con MP3 o WAV.')}
                   onLoadedMetadata={event => {
-                    if (event.currentTarget.duration > 180 && Number.isFinite(event.currentTarget.duration)) {
+                    if (!processing && event.currentTarget.duration > 180 && Number.isFinite(event.currentTarget.duration)) {
                       setSource(null)
                       setError('La nota supera el límite de 3 minutos.')
                     }
                   }} />
+                <button className="primary transcribe-button" disabled={busy} onClick={() => void transcribe()}>Transcribir</button>
               </div>
             )}
+          </section>
+          <section className="panel" aria-labelledby="transcript-title">
+            <h2 id="transcript-title">Transcripción</h2>
+            <p role="status" className="muted">
+              {processing ? 'Transcribiendo en español. La primera carga del modelo puede tardar unos minutos…' :
+                segments.length ? `${segments.length} segmentos` : 'Selecciona una nota y pulsa Transcribir.'}
+            </p>
+            {segments.map(segment => (
+              <p key={segment.start}><strong>{clock(segment.start)}</strong> {segment.text}</p>
+            ))}
           </section>
         </div>
       </main>
