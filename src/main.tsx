@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AudioLines, Download, FileAudio, Mic, Play, Square } from 'lucide-react'
+import { example, exampleSegments, type Segment } from './example'
 import { useRecorder } from './useRecorder'
 import './styles.css'
 
 type AudioSource = { name: string } & ({ blob: Blob; url?: never } | { url: string; blob?: never })
-type Segment = { start: number; end: number; text: string }
-const example = {
-  name: 'Ideas para el portafolio',
-  url: import.meta.env.BASE_URL + 'ejemplo.mp3',
-}
+const demo = import.meta.env.MODE === 'demo'
 
 function clock(seconds: number) {
   const whole = Math.floor(seconds)
@@ -35,11 +32,11 @@ function downloadMarkdown(segments: Segment[]) {
 }
 
 function App() {
-  const [source, setSource] = useState<AudioSource | null>(null)
+  const [source, setSource] = useState<AudioSource | null>(demo ? example : null)
   const [playback, setPlayback] = useState('')
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
-  const [segments, setSegments] = useState<Segment[]>([])
+  const [segments, setSegments] = useState<Segment[]>(demo ? exampleSegments : [])
   const [position, setPosition] = useState(0)
   const [canSeek, setCanSeek] = useState(false)
   const audio = useRef<HTMLAudioElement>(null)
@@ -104,7 +101,12 @@ function App() {
 
   return (
     <>
-      <header className="top"><div className="wrap brand"><AudioLines aria-hidden="true" /> Notas de voz</div></header>
+      <header className="top">
+        <div className="wrap top-inner">
+          <div className="brand"><AudioLines aria-hidden="true" /> Notas de voz</div>
+          {demo && <span className="mode">Modo demo</span>}
+        </div>
+      </header>
       <main className="wrap">
         <section className="intro">
           <h1>De voz a texto.</h1>
@@ -113,31 +115,45 @@ function App() {
         <div className="workspace">
           <section className="panel source-panel" aria-labelledby="audio-title">
             <h2 id="audio-title">Audio de origen</h2>
-            <p className="muted">Hasta 3 minutos · máximo 32 MB</p>
-            <div className="actions">
-              <button className="primary" disabled={recorder.state === 'requesting' || processing} onClick={() => {
+            {demo ? <>
+              <p className="muted">Escucha la nota de ejemplo, corrige los segmentos y descarga el texto.</p>
+              <p className="muted">La transcripción de esta nota ya está cargada. Para grabar o transcribir tu propio audio, <a href="https://github.com/Humiumii/notas-de-voz#modo-local">ejecuta el proyecto en local</a>.</p>
+              <button className="text-button" onClick={() => {
+                setSegments(exampleSegments)
                 setError('')
-                if (recording) recorder.stop()
-                else void recorder.start()
-              }}>
-                {recording ? <Square /> : <Mic />}
-                {recording ? `Detener · ${clock(recorder.elapsed)}` : 'Grabar audio'}
-              </button>
-              <label className="file-button">
-                <FileAudio />
-                Cargar archivo
-                <input type="file" accept="audio/*,.webm,.mp4,.m4a,.ogg" disabled={busy} onChange={event => {
-                  const file = event.currentTarget.files?.[0]
-                  if (file) load({ name: file.name, blob: file })
-                  event.currentTarget.value = ''
-                }} />
-              </label>
-              <button className="text-button" disabled={busy} onClick={() => load(example)}>Usar nota de ejemplo</button>
-            </div>
-            {recorder.state === 'requesting' && <p role="status">Esperando permiso para usar el micrófono…</p>}
+                if (audio.current) {
+                  audio.current.pause()
+                  audio.current.currentTime = 0
+                  setPosition(0)
+                }
+              }}>Restaurar ejemplo</button>
+            </> : <>
+              <p className="muted">Hasta 3 minutos · máximo 32 MB</p>
+              <div className="actions">
+                <button className="primary" disabled={recorder.state === 'requesting' || processing} onClick={() => {
+                  setError('')
+                  if (recording) recorder.stop()
+                  else void recorder.start()
+                }}>
+                  {recording ? <Square /> : <Mic />}
+                  {recording ? `Detener · ${clock(recorder.elapsed)}` : 'Grabar audio'}
+                </button>
+                <label className="file-button">
+                  <FileAudio />
+                  Cargar archivo
+                  <input type="file" accept="audio/*,.webm,.mp4,.m4a,.ogg" disabled={busy} onChange={event => {
+                    const file = event.currentTarget.files?.[0]
+                    if (file) load({ name: file.name, blob: file })
+                    event.currentTarget.value = ''
+                  }} />
+                </label>
+                <button className="text-button" disabled={busy} onClick={() => load(example)}>Usar nota de ejemplo</button>
+              </div>
+              {recorder.state === 'requesting' && <p role="status">Esperando permiso para usar el micrófono…</p>}
+              {source && <button className="primary transcribe-button" disabled={busy || segments.length > 0}
+                onClick={() => void transcribe()}>{processing ? 'Transcribiendo…' : segments.length ? 'Nota transcrita' : 'Transcribir'}</button>}
+            </>}
             {error && <p className="error" role="alert">{error}</p>}
-            {source && <button className="primary transcribe-button" disabled={busy || segments.length > 0}
-              onClick={() => void transcribe()}>{processing ? 'Transcribiendo…' : segments.length ? 'Nota transcrita' : 'Transcribir'}</button>}
           </section>
           {playback && (
             <section className="panel player" aria-label="Reproductor">

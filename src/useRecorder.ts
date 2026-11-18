@@ -69,7 +69,8 @@ export function useRecorder(onAudio: (blob: Blob) => void, onError: (message: st
       timer.current = window.setInterval(() => {
         setElapsed(Math.min(LIMIT, Math.floor((performance.now() - started) / 1000)))
       }, 200)
-      timeout.current = window.setTimeout(stop, LIMIT * 1000)
+      // Leave room for the recorder to finalize its last audio frame.
+      timeout.current = window.setTimeout(stop, LIMIT * 1000 - 250)
     } catch (error) {
       stream?.getTracks().forEach(track => track.stop())
       if (!mounted.current) return

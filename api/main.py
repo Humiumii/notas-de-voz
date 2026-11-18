@@ -4,7 +4,7 @@ import subprocess
 from collections.abc import Callable
 from functools import lru_cache
 from threading import Lock
-from typing import Annotated
+from typing import Annotated, BinaryIO
 
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
@@ -54,16 +54,16 @@ def get_engine():
     return transcribe
 
 
-def decode(content: bytes) -> np.ndarray:
+def decode(content: BinaryIO) -> np.ndarray:
     try:
         result = subprocess.run(
             [
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
-                "-protocol_whitelist", "pipe", "-i", "pipe:0",
+                "-protocol_whitelist", "fd,pipe", "-i", "fd:",
                 "-map", "0:a:0", "-t", str(MAX_SECONDS + 1),
                 "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "pipe:1",
             ],
-            input=content,
+            stdin=content,
             capture_output=True,
             timeout=30,
             check=False,
@@ -83,13 +83,14 @@ def decode(content: bytes) -> np.ndarray:
 
 @app.post("/api/transcribir")
 def transcription(audio: UploadFile, engine: Annotated[Callable[[np.ndarray], list[Segment]], Depends(get_engine)]) -> Transcript:
-    with audio.file:
-        content = audio.file.read(MAX_BYTES + 1)
-    if len(content) > MAX_BYTES:
-        raise HTTPException(413, "El archivo supera el límite de 32 MB.")
-    if not content:
-        raise HTTPException(422, "El archivo de audio está vacío.")
-    decoded = decode(content)
+    with audio.file as content:
+        size = content.seek(0, os.SEEK_END)
+        if size > MAX_BYTES:
+            raise HTTPException(413, "El archivo supera el límite de 32 MB.")
+        if not size:
+            raise HTTPException(422, "El archivo de audio está vacío.")
+        content.seek(0)
+        decoded = decode(content)
     try:
         segments = engine(decoded)
     except Exception as exc:
