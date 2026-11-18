@@ -1,6 +1,8 @@
 import io
+import subprocess
 import wave
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 from fastapi.testclient import TestClient
@@ -29,6 +31,18 @@ def test_demo_note(client):
     assert response.json() == {
         "segments": [{"start": 0.2, "end": 1.4, "text": "Una nota en español."}]
     }
+
+
+def test_m4a_with_metadata_after_audio(client):
+    source = Path(__file__).resolve().parents[1] / "public" / "ejemplo.mp3"
+    with TemporaryDirectory() as directory:
+        m4a = Path(directory) / "nota.m4a"
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(source), "-c:a", "aac", str(m4a)],
+            check=True,
+        )
+        response = client.post("/api/transcribir", files={"audio": (m4a.name, m4a.read_bytes())})
+    assert response.status_code == 200
 
 
 @pytest.mark.parametrize("content", [b"archivo invalido", b""])

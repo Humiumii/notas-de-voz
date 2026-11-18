@@ -32,8 +32,11 @@ button:disabled, .file-button:has(:disabled) { opacity: .55; cursor: default; }
 button svg, .file-button svg { width: 1.1rem; height: 1.1rem; }
 .wrap { width: min(100% - 2rem, 72rem); margin-inline: auto; }
 .top { border-bottom: 1px solid var(--line); background: white; }
+.top-inner { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
 .brand { display: flex; align-items: center; gap: .65rem; min-height: 66px; font-weight: 750; }
 .brand svg { color: var(--accent); }
+.mode { padding: .35rem .7rem; background: var(--soft); color: var(--accent); border-radius: 2rem; font-size: .875rem; font-weight: 650; }
+.source-panel a { color: var(--accent); text-underline-offset: .15em; }
 .intro { margin-block: clamp(2rem, 6vw, 4.5rem) 2rem; }
 h1 { font-family: Georgia, serif; font-size: clamp(2.7rem, 6vw, 5rem); letter-spacing: -.055em; line-height: .98; font-weight: 500; margin: 0; }
 .intro p { color: var(--muted); font-size: 1.1rem; margin-bottom: 0; }
@@ -53,6 +56,7 @@ h2 { font-size: 1.25rem; margin: 0; }
 .actions { display: grid; gap: .55rem; margin-top: 1.25rem; }
 .primary { background: var(--accent); color: white; border-color: var(--accent); }
 .text-button { background: transparent; color: var(--accent); border-color: transparent; }
+.text-button:hover:not(:disabled) { background: var(--soft); border-color: transparent; }
 .file-button { position: relative; }
 .file-button input { opacity: 0; position: absolute; inset: 0; width: 100%; cursor: inherit; }
 .player { grid-column: 1; overflow-wrap: anywhere; position: sticky; top: .5rem; z-index: 1; }
